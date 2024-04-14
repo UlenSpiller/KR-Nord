@@ -1,5 +1,5 @@
 import sqlite3
-from pathlib import Path
+
 
 class BDP:  # MA - mobile accounting
 
@@ -16,12 +16,13 @@ class BDP:  # MA - mobile accounting
                 ver_mn TEXT
                 );""")
             print("Таблица ver актуализирована")
-            cur.execute("""CREATE TABLE IF NOT EXISTS head_pdats(
+            # noinspection
+            cur.execute("""CREATE TABLE IF NOT EXISTS head_pdats( 
                 pdat_code TEXT,
                 pdat_desc TEXT,
                 pdat_dicl TEXT,
                 pdat_docl TEXT,
-                pdat_btqy TEXT);""")
+                pdat_bqty TEXT);""")
             print("Таблица head_pdats актуализирована")
 
             cur.execute("""CREATE TABLE IF NOT EXISTS body_bars(
@@ -50,7 +51,7 @@ class BDP:  # MA - mobile accounting
                  cut_ab2 TEXT,
                  cut_il TEXT,
                  cut_ol TEXT,
-                 cut_bcode TEXT,
+                 cut_bcod TEXT,
                  cut_csna TEXT,
                  cut_csnu TEXT,
                  cut_tina TEXT,
@@ -66,6 +67,7 @@ class BDP:  # MA - mobile accounting
     # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
     """Парсим файл и заполняем таблицы vers, head_pdats, body_bars, bar_cuts данными"""
+
     @staticmethod
     def pars_file(name_db, name_xml):
         import xml.etree.ElementTree as ET
@@ -107,7 +109,7 @@ class BDP:  # MA - mobile accounting
             cur.execute("""SELECT COUNT (*) FROM head_pdats;""")
 
             cur.executemany(
-                """INSERT INTO head_pdats(pdat_code, pdat_desc, pdat_dicl, pdat_docl, pdat_btqy)
+                """INSERT INTO head_pdats(pdat_code, pdat_desc, pdat_dicl, pdat_docl, pdat_bqty)
                  VALUES(?,?,?,?,?);""", pdat_data)
 
         db.commit()  # Завершение транзакции
@@ -176,7 +178,7 @@ class BDP:  # MA - mobile accounting
                     # Добавляем данные в таблицу bar_cuts
                     cur.execute(
                         """INSERT INTO bar_cuts(bar_id, cut_priority, cut_angl, cut_angr, cut_ab1,
-                                 cut_ab2, cut_il, cut_ol, cut_bcode, cut_csna, cut_tina, cut_stat,
+                                 cut_ab2, cut_il, cut_ol, cut_bcod, cut_csna, cut_tina, cut_stat,
                                  cut_lbl_row1, cut_lbl_row2, cut_lbl_row3, cut_lbl_row4, cut_lbl_row5)
                                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);""", cut_data)
                     cut_priority += 1
@@ -186,11 +188,12 @@ class BDP:  # MA - mobile accounting
 
         print('Данные body_bars  и bar_cuts внесены')
 
-# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-    """Удаляем базу данных перед перезаписью фойла *.db """
+    """Удаляем базу данных перед или после созданием файла *.db """
+
     @staticmethod
-    def delete_temp_db(name_db):
+    def delete_temp_db(name_db):  # Принимаем путь к папке, а не к файлу
         import os
         if os.path.exists(name_db):
             os.remove(name_db)
@@ -200,50 +203,8 @@ class BDP:  # MA - mobile accounting
 
     # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-    # """Открываем диалоговое окно для выбора файла """
-    # @staticmethod
-    # def dialog_window():
-    #     import tkinter as tk
-    #     from tkinter import filedialog
-    #     from tkinter import Checkbutton
-    #     import os
-    #
-    #     def open_file_dialog():
-    #         nonlocal file_name
-    #         file_path = filedialog.askopenfilename(filetypes=[("XML files", "*.xml")])
-    #         if file_path:
-    #             file_name = os.path.splitext(os.path.basename(file_path))[0]
-    #             print(f"Выбран файл: {file_path}")
-    #             print(f"Имя файла без расширения: {file_name}")
-    #             root.quit()  # Закрываем окно Tkinter
-    #
-    #     # def rotate_angle_checkbox():
-    #     #     print('Ang is rotated')
-    #
-    #     file_name = None
-    #     root = tk.Tk()
-    #     root.geometry('400x200')
-    #     root.title("Optimization of the cutting sheet")
-    #     button = tk.Button(root, text="Select XML file", command=open_file_dialog)
-    #     # button.pack()
-    #     button.grid(row=0, column=0, padx=0, pady=0)  # Задайте ряд и столбец, а также отступы
-    #
-    #     # # Создайте переменную для состояния чекбокса
-    #     # checkbox_state = tk.IntVar()
-    #     # # Создайте чекбокс и свяжите его с переменной состояния и функцией обработчика
-    #     # checkbox = Checkbutton(root, text="Выполнить rotate_angle", variable=checkbox_state,
-    #     #                        command=BDP.rotate_ang)
-    #     # # checkbox.pack()
-    #     # checkbox.grid(row=0, column=1, padx=1, pady=0)  # Задайте ряд и столбец, а также отступы
-    #
-    #
-    #     root.mainloop()
-    #
-    #     return file_name
-
-    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
     """Переворачиваем углы на раме 86102 """
+
     @staticmethod
     def rotate_ang(name_db):
         import sqlite3
@@ -257,8 +218,9 @@ class BDP:  # MA - mobile accounting
             SELECT bc.cut_id, bb.bar_code, bc.cut_angl, bc.cut_angr, cut_ol
             FROM body_bars AS bb
             LEFT JOIN bar_cuts AS bc ON bb.bar_id = bc.bar_id
-            WHERE bb.bar_code LIKE '86102%' AND bc.cut_angl != bc.cut_angr """
-
+            WHERE (bb.bar_code LIKE '86102%' OR bb.bar_code LIKE '86517%') AND bc.cut_angl != bc.cut_angr """
+        # (bb.bar_code LIKE '86102%')
+        # (bb.bar_code LIKE '86102%' OR bb.bar_code LIKE '86517%')
         # Выполнение SQL-запроса
         cursor.execute(select_query)
 
@@ -296,8 +258,7 @@ class BDP:  # MA - mobile accounting
                 WHERE cut_id = ?"""
             cursor.execute(update_query, (cut_angl, cut_angr, cut_id))
             assert cursor.rowcount == 1, f"Ожидали обновить {len(rotate_rows)} строк, фактически обновлено {k}"
-            k = k+ cursor.rowcount
-
+            k = k + cursor.rowcount
 
         print(f"Ожидали обновить {len(rotate_rows)} строк, фактически обновлено {k}")
         # Проверка, что количество обновлённых строк соответствует ожиданиям
@@ -307,15 +268,16 @@ class BDP:  # MA - mobile accounting
         # Сохранение изменений
         conn.commit()
 
-# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
     """Записываем преобразованные данные в файл *_new.xml"""
+
     @staticmethod
     def make_new_xml(name_db, name_out_xml):
         import sqlite3
         import xml.etree.ElementTree as ET
 
-        # name_db = '060_test.db'  # Имя БД изкоторой формируется xml файл
+        # name_db = '060_test.db'  # Имя БД из которой формируется xml файл
         # name_out_xml = 'example.xml'
         """Создаем корневой элемент"""
         job_teg = ET.Element("JOB")
@@ -357,7 +319,7 @@ class BDP:  # MA - mobile accounting
         conn = sqlite3.connect(name_db)
         cursor = conn.cursor()
         # SQL-запрос для правого объединения и выборки строк, удовлетворяющих условию с регулярным выражением
-        select_query = """SELECT pdat_code, pdat_dicl, pdat_docl, pdat_btqy FROM head_pdats """
+        select_query = """SELECT pdat_code, pdat_desc, pdat_dicl, pdat_docl, pdat_bqty FROM head_pdats """
         # Выполнение SQL-запроса
         cursor.execute(select_query)
 
@@ -377,21 +339,26 @@ class BDP:  # MA - mobile accounting
             code_teg.text = i[0]
             print(i[0])
             pdat_teg.append(code_teg)
+            # ------------DESC---------
+            desc_teg = ET.Element("DESC")
+            desc_teg.text = i[1]
+            print(i[1])
+            pdat_teg.append(desc_teg)
             # ------------DICL---------
             dicl_teg = ET.Element("DICL")
-            dicl_teg.text = i[1]
-            print(i[1])
+            dicl_teg.text = i[2]
+            print(i[2])
             pdat_teg.append(dicl_teg)
             # ------------DOCL---------
             docl_teg = ET.Element("DOCL")
-            docl_teg.text = i[2]
-            print(i[2])
+            docl_teg.text = i[3]
+            print(i[3])
             pdat_teg.append(docl_teg)
             # ------------BTQY---------
-            btqy_teg = ET.Element("BTQY")
-            btqy_teg.text = i[3]
-            print(i[3])
-            pdat_teg.append(btqy_teg)
+            bqty_teg = ET.Element("BQTY")
+            bqty_teg.text = i[4]
+            print(i[4])
+            pdat_teg.append(bqty_teg)
 
         """****************************** Конец сборки в теге HEAD***********************************"""
         # //////////////////////////////////////////////////////////////////////////////////////////
@@ -524,11 +491,11 @@ class BDP:  # MA - mobile accounting
                 ol_teg.text = j[8]
                 print(j[8])
                 cut_teg.append(ol_teg)
-                # -----------BCODE------------
-                bcode_teg = ET.Element("BCODE")
-                bcode_teg.text = j[9]
+                # -----------BCOD------------
+                bcod_teg = ET.Element("BCOD")
+                bcod_teg.text = j[9]
                 print(j[9])
-                cut_teg.append(bcode_teg)
+                cut_teg.append(bcod_teg)
                 # -----------CSNA------------
                 csna_teg = ET.Element("CSNA")
                 csna_teg.text = j[10]
